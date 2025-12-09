@@ -1,9 +1,14 @@
 *.ipynb
-.git
-.vscode
+*.git
+*.vscode
 *.log
 
 __pycache__/
 
 venv/
-.venv
+*.venv
+
+*.spec
+
+build/
+dist/

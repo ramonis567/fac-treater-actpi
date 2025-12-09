@@ -20,7 +20,7 @@ def render_app():
 
     uploaded_file = st.file_uploader(
         "Faça o upload da RD",
-        type=["xlsm"]
+        type=["xlsm", "xlsx"]
     )
 
     if uploaded_file:
