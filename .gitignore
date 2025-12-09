@@ -1,0 +1,10 @@
+FAC_processed.xlsx
+*.ipynb
+.git
+.vscode
+*.log
+
+__pycache__/
+
+venv/
+.venv
