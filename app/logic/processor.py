@@ -51,17 +51,15 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
 def apply_business_logic(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Tratamento final (sem custos):
-    - Localiza dinamicamente a linha real de cabeçalho (onde existe 'DESCRIÇÃO')
-    - Promove essa linha como cabeçalho
-    - Normaliza para:
-      DESCRIÇÃO | FUNÇÃO | HORAS
+    Nova versão:
+    - Localiza dinamicamente a linha de cabeçalho real ('DESCRIÇÃO')
+    - Normaliza dados
+    - Transforma FUNÇÕES em COLUNAS (pivot)
     """
 
     # ─────────────────────────────────────────────
-    # 1️⃣ LOCALIZA A LINHA REAL DE CABEÇALHO
+    # 1️⃣ LOCALIZA A LINHA REAL DO CABEÇALHO
     # ─────────────────────────────────────────────
-
     header_row_idx = None
 
     for i in range(len(df)):
@@ -71,105 +69,82 @@ def apply_business_logic(df: pd.DataFrame) -> pd.DataFrame:
             break
 
     if header_row_idx is None:
-        raise ValueError(
-            "Não foi possível localizar a linha de cabeçalho com a coluna 'DESCRIÇÃO'."
-        )
+        raise ValueError("Não foi possível localizar a linha de cabeçalho com 'DESCRIÇÃO'.")
 
-    _debug(f"Linha real de cabeçalho localizada no índice {header_row_idx}")
+    _debug(f"Cabeçalho localizado na linha {header_row_idx}")
 
     # ─────────────────────────────────────────────
-    # 2️⃣ PROMOVE O CABEÇALHO REAL
+    # 2️⃣ PROMOVE CABEÇALHO
     # ─────────────────────────────────────────────
-
     df = df.iloc[header_row_idx:].copy().reset_index(drop=True)
-
     df.columns = df.iloc[0]
     df = df.iloc[1:].copy().reset_index(drop=True)
     df.columns = df.columns.astype(str).str.strip()
 
-    _debug(f"Cabeçalhos finais: {list(df.columns)}")
+    _debug(f"Colunas detectadas: {list(df.columns)}")
+
+    df.dropna(subset=["PREÇO DE_x000D_\nVENDA (UNIT)"], inplace=True)
+    print(df.head(10))
 
     # ─────────────────────────────────────────────
-    # 3️⃣ VALIDA COLUNA DE DESCRIÇÃO
+    # 3️⃣ IDENTIFICA COLUNA DESCRIÇÃO
     # ─────────────────────────────────────────────
-
     if "DESCRIÇÃO" not in df.columns:
-        raise ValueError(
-            f"Coluna 'DESCRIÇÃO' não encontrada. Colunas disponíveis: {list(df.columns)}"
-        )
+        raise ValueError("Coluna 'DESCRIÇÃO' não encontrada após promoção do cabeçalho.")
 
     descricao_col = "DESCRIÇÃO"
 
     # ─────────────────────────────────────────────
-    # 4️⃣ FILTRA COLUNAS DE FUNÇÃO
+    # 4️⃣ DEFINE FUNÇÕES COMO COLUNAS (LISTA BRANCA)
     # ─────────────────────────────────────────────
+    funcoes_desejadas = [
+        "QTDE",
+        "MAT. ESPEC.",
+        "MAT. GERAL",
+        "COOR ENG DTFD",
+        "CONS ENG DTFD",
+        "PROJ DTFD",
+        "APOIO DTFD",
+        "FAB MEC",
+        "MONT MEC",
+        "MONT ELET",
+    ]
 
-    funcoes_validas = []
+    # Mantém também qualquer outra função nova que venha futuramente
+    funcoes_detectadas = []
 
     for col in df.columns:
-        col_str = str(col).upper()
+        if col == descricao_col:
+            continue
+        if col.upper() in [c.upper() for c in funcoes_desejadas]:
+            funcoes_detectadas.append(col)
 
-        if col_str in ["ITEM", "DESCRIÇÃO"]:
-            continue
-        if "%" in col_str:
-            continue
-        if "VALOR" in col_str:
-            continue
-        if "PREÇO" in col_str:
-            continue
-        if "SOMA" in col_str:
-            continue
-        if "DATA BASE" in col_str:
-            continue
-
-        funcoes_validas.append(col)
-
-    if not funcoes_validas:
+    if not funcoes_detectadas:
         raise ValueError("Nenhuma coluna de função válida foi detectada.")
 
-    _debug(f"Funções válidas detectadas: {funcoes_validas}")
+    _debug(f"Funções utilizadas como colunas: {funcoes_detectadas}")
 
     # ─────────────────────────────────────────────
-    # 5️⃣ NORMALIZA PARA FORMATO FINAL
+    # 5️⃣ LIMPA E NORMALIZA OS VALORES NUMÉRICOS
     # ─────────────────────────────────────────────
-
-    output_rows = []
-
-    for _, row in df.iterrows():
-        descricao = row.get(descricao_col)
-
-        if pd.isna(descricao):
-            continue
-
-        for funcao in funcoes_validas:
-            horas = row.get(funcao)
-
-            if pd.isna(horas):
-                continue
-
-            try:
-                horas = float(str(horas).replace(",", "."))
-            except (ValueError, TypeError):
-                continue
-
-            if horas == 0:
-                continue
-
-            output_rows.append({
-                "DESCRIÇÃO": descricao,
-                "FUNÇÃO": funcao,
-                "HORAS": horas
-            })
-
-    if not output_rows:
-        raise ValueError(
-            "Nenhuma linha válida foi gerada. "
-            "Verifique se existem valores numéricos de horas nas colunas de função."
+    for funcao in funcoes_detectadas:
+        df[funcao] = (
+            df[funcao]
+            .astype(str)
+            .str.replace(",", ".", regex=False)
+            .str.strip()
         )
+        df[funcao] = pd.to_numeric(df[funcao], errors="coerce").fillna(0)
 
-    output_df = pd.DataFrame(output_rows)
+    # ─────────────────────────────────────────────
+    # 6️⃣ RETORNA NO FORMATO FINAL (DESCRIÇÃO + FUNÇÕES-COLUNAS)
+    # ─────────────────────────────────────────────
+    output_df = df[[descricao_col] + funcoes_detectadas].copy()
 
-    _debug(f"{len(output_df)} linhas normalizadas geradas.")
+    output_df = output_df[output_df[descricao_col].notna()]
+    output_df = output_df.reset_index(drop=True)
+
+    _debug(f"Formato final gerado com {output_df.shape[0]} linhas e {output_df.shape[1]} colunas.")
 
     return output_df
 
