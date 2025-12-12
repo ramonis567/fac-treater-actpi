@@ -18,13 +18,9 @@ def render_app():
         "Faça o upload da RD do projeto e selecione as abas de FAC e EAP."
     )
 
-    # ✅ INIT SESSION STATE
-    if "fac_output" not in st.session_state:
-        st.session_state.fac_output = None
-
-    if "eap_output" not in st.session_state:
-        st.session_state.eap_output = None
-
+    # =========================================================
+    # SESSION STATE
+    # =========================================================
     if "merged_output" not in st.session_state:
         st.session_state.merged_output = None
 
@@ -50,9 +46,9 @@ def render_app():
                 index=sheet_names.index("EAP") if "EAP" in sheet_names else 0
             )
 
-            st.info(f"FAC selecionado: {fac_sheet}")
-            st.info(f"EAP selecionado: {eap_sheet}")
-
+            # =================================================
+            # PROCESS
+            # =================================================
             if st.button("Executar Processamento"):
                 with st.spinner("Processando FAC, EAP e Consolidação..."):
 
@@ -68,65 +64,29 @@ def render_app():
                         engine="openpyxl"
                     )
 
-                    # ✅ AGORA RECEBE 3 RETORNOS
-                    fac_processed, eap_processed, merged_processed = process_fac_and_eap(
+                    _, _, merged_processed = process_fac_and_eap(
                         df_fac, df_eap
                     )
 
-                    # ==========================
-                    # ✅ STORE FAC IN SESSION
-                    # ==========================
-                    fac_output = BytesIO()
-                    with pd.ExcelWriter(fac_output, engine="openpyxl") as writer:
-                        fac_processed.to_excel(
-                            writer, index=False, sheet_name="FAC_TRATADO"
-                        )
-                    fac_output.seek(0)
-                    st.session_state.fac_output = fac_output
-
-                    # ==========================
-                    # ✅ STORE EAP IN SESSION
-                    # ==========================
-                    eap_output = BytesIO()
-                    with pd.ExcelWriter(eap_output, engine="openpyxl") as writer:
-                        eap_processed.to_excel(
-                            writer, index=False, sheet_name="EAP_TRATADO"
-                        )
-                    eap_output.seek(0)
-                    st.session_state.eap_output = eap_output
-
-                    # ==========================
-                    # ✅ STORE CONSOLIDADO IN SESSION
-                    # ==========================
+                    # =============================================
+                    # STORE CONSOLIDADO
+                    # =============================================
                     merged_output = BytesIO()
                     with pd.ExcelWriter(merged_output, engine="openpyxl") as writer:
                         merged_processed.to_excel(
-                            writer, index=False, sheet_name="FAC_EAP_CONSOLIDADO"
+                            writer,
+                            index=False,
+                            sheet_name="FAC_EAP_CONSOLIDADO"
                         )
                     merged_output.seek(0)
+
                     st.session_state.merged_output = merged_output
 
-                    st.success("FAC, EAP e Consolidação processados com sucesso.")
+                    st.success("Processamento concluído com sucesso.")
 
-            # ==========================
-            # ✅ ALWAYS SHOW DOWNLOADS IF EXISTS
-            # ==========================
-            if st.session_state.fac_output is not None:
-                st.download_button(
-                    label="📥 Download FAC Tratado",
-                    data=st.session_state.fac_output,
-                    file_name="FAC_TRATADO.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-            if st.session_state.eap_output is not None:
-                st.download_button(
-                    label="📥 Download EAP Tratado",
-                    data=st.session_state.eap_output,
-                    file_name="EAP_TRATADO.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
+            # =================================================
+            # DOWNLOAD FINAL ONLY
+            # =================================================
             if st.session_state.merged_output is not None:
                 st.download_button(
                     label="📥 Download FAC + EAP Consolidado",
