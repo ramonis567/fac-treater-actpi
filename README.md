@@ -46,16 +46,27 @@ Quando uma TAG possui múltiplos códigos
 
 ## 📂 Estrutura de Diretórios
 fac-treater-actpi/
+
 ├── README.md
+
 ├── main.py
+
 ├── requirements.txt
+
 └── app/
+
 ├── config/
+
 │ └── settings.py
+
 ├── logic/
+
 │ ├── eap_processor.py
+
 │ └── processor.py
+
 └── ui/
+
 └── layout.py
 
 ---
