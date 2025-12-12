@@ -19,16 +19,20 @@ def render_app():
     )
 
     # =========================================================
-    # SESSION STATE
+    # STATE MANAGEMENT
     # =========================================================
     if "merged_output" not in st.session_state:
         st.session_state.merged_output = None
 
+    # =================================================
+    # FILE UPLOADER
+    # =================================================
     uploaded_file = st.file_uploader(
         "Faça o upload da RD",
         type=["xlsm", "xlsx", "xls"]
     )
 
+    # Validação e processamento do arquivo
     if uploaded_file:
         try:
             excel_file = pd.ExcelFile(uploaded_file)
@@ -47,7 +51,7 @@ def render_app():
             )
 
             # =================================================
-            # PROCESS
+            # PROCESSAMENTO
             # =================================================
             if st.button("Executar Processamento"):
                 with st.spinner("Processando FAC, EAP e Consolidação..."):
@@ -85,7 +89,7 @@ def render_app():
                     st.success("Processamento concluído com sucesso.")
 
             # =================================================
-            # DOWNLOAD FINAL ONLY
+            # DOWNLOAD FINAL
             # =================================================
             if st.session_state.merged_output is not None:
                 st.download_button(

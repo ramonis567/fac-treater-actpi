@@ -1,6 +1,8 @@
 import pandas as pd
 
-
+# ==============================================
+# FUNÇÃO PRINCIPAL DE PROCESSAMENTO DA EAP
+# ==============================================
 def process_eap_data(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         raise ValueError("A aba EAP está vazia.")

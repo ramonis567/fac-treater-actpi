@@ -3,8 +3,7 @@ import re
 
 from app.logic.eap_processor import process_eap_data
 
-DEBUG = True  # 🔁 Coloque False em produção
-
+DEBUG = False  # Em produção, manter como False / Em desenvolvimento, pode usar True para logs
 
 def _debug(msg: str):
     if DEBUG:
@@ -12,9 +11,8 @@ def _debug(msg: str):
 
 
 # ============================================================
-#  VALIDATION
+#  VALIDAÇÃO DE ARQUIVOS
 # ============================================================
-
 def validate_input(df: pd.DataFrame) -> None:
     if df is None:
         raise ValueError("Nenhum dado foi recebido para processamento.")
@@ -32,9 +30,8 @@ def validate_input(df: pd.DataFrame) -> None:
 
 
 # ============================================================
-#  FAC – PREPROCESS
+#  PRÉ-PROCESSAMENTO DA ABA FAC
 # ============================================================
-
 def preprocess_fac(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.astype(str).str.strip()
@@ -45,11 +42,9 @@ def preprocess_fac(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ============================================================
-#  FAC – BUSINESS LOGIC (SEM CUSTOS)
+#  LOGICA DE TRATAMENTO DA ABA FAC
 # ============================================================
-
 def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
-
     # 1) Localiza linha do cabeçalho
     header_row_idx = None
     for i in range(len(df)):
@@ -93,7 +88,7 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
         "MONT ELET",
     ]
 
-    # Detecta colunas existentes
+    # 3) Detecta colunas existentes
     funcoes_detectadas = []
     upper_map = {c.upper(): c for c in df.columns}
     for f in funcoes_desejadas:
@@ -105,7 +100,7 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
 
     _debug(f"[FAC] Funções utilizadas como colunas: {funcoes_detectadas}")
 
-    # Normaliza números
+    # 4) Normaliza números
     for funcao in funcoes_detectadas:
         df[funcao] = df[funcao].astype(str).str.replace(",", ".", regex=False).str.strip()
         df[funcao] = pd.to_numeric(df[funcao], errors="coerce").fillna(0)
@@ -116,10 +111,15 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
     return output_df
 
 
+# ============================================================
+#  PÓS-PROCESSAMENTO DA ABA FAC
+# ============================================================
 def postprocess_fac(df: pd.DataFrame) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
-
+# ============================================================
+#  PIPELINE COMPLETO DA ABA FAC
+# ============================================================
 def process_fac(df: pd.DataFrame) -> pd.DataFrame:
     validate_input(df)
     df = preprocess_fac(df)
@@ -129,9 +129,8 @@ def process_fac(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ============================================================
-#  TAG SPLIT FUNCTION
+#  FUNÇÃO DE DIVISÃO DE TAG
 # ============================================================
-
 def split_tag(tag: str):
     """Divide TAG em TAG_CODE e TAG_DESCRICAO."""
     if not tag or str(tag).lower() == "nan":
@@ -146,9 +145,8 @@ def split_tag(tag: str):
 
 
 # ============================================================
-#  MERGE FAC + EAP + SUBESTACAO + TAG
+#  MERGE FAC + EAP
 # ============================================================
-
 def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     fac = fac_df.copy()
     eap = eap_df.copy()
@@ -189,24 +187,20 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
         return ""
 
     # --------------------------------------------------------
-    # LEVEL 4 rows only
+    # LEVEL 4 → ITENS FINAIS
     # --------------------------------------------------------
     regex_lvl4 = r"^\d+\.\d+\.\d+\.\d+$"
     eap_lvl4 = eap[eap["ITEM"].astype(str).str.match(regex_lvl4, na=False)].copy()
 
-    # SUBESTACAO COLUMN (antes era LEVEL_2)
     eap_lvl4["SUBESTACAO"] = eap_lvl4["ITEM"].astype(str).apply(find_subestacao)
-
-    # TAG RAW (temporário; será removido ao final do pipeline)
     eap_lvl4["TAG_RAW"] = eap_lvl4["ITEM"].astype(str).apply(find_parent_tag)
 
-    # TAG_CODE + TAG_DESCRICAO
     eap_lvl4[["TAG_CODE", "TAG_DESCRICAO"]] = eap_lvl4["TAG_RAW"].apply(
         lambda x: pd.Series(split_tag(x))
     )
 
     # --------------------------------------------------------
-    # MERGE FAC
+    # MERGE
     # --------------------------------------------------------
     fac_functions = [c for c in fac.columns if c != "DESCRIÇÃO"]
 
@@ -224,11 +218,11 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
         if col in merged.columns:
             merged[col] = merged[col].fillna(0)
 
-    # Remove QTDE columns
+    # Remove colunas de QTDE
     qtde_cols = [c for c in merged.columns if c.upper().startswith("QTDE")]
     merged = merged.drop(columns=qtde_cols, errors="ignore")
 
-    # Order columns: ITEM | SUBESTACAO | TAG_CODE | TAG_DESCRICAO | TAG_RAW | ...
+    # Reordena colunas: ITEM | SUBESTACAO | TAG_CODE | TAG_DESCRICAO | TAG_RAW | ...
     priority_cols = ["ITEM", "SUBESTACAO", "TAG_CODE", "TAG_DESCRICAO", "TAG_RAW"]
     other_cols = [c for c in merged.columns if c not in priority_cols]
     merged = merged[priority_cols + other_cols]
@@ -239,9 +233,7 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 #  EXPLODE TAG
 # ============================================================
-
 def explode_by_tag(df: pd.DataFrame) -> pd.DataFrame:
-
     if "TAG_CODE" not in df.columns:
         return df
 
@@ -268,7 +260,6 @@ def explode_by_tag(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 #  PIPELINE COMPLETO
 # ============================================================
-
 def process_fac_and_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame):
 
     _debug("=== Processando FAC ===")
