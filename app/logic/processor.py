@@ -84,8 +84,11 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
         "PROJ DTFD",
         "APOIO DTFD",
         "FAB MEC",
+        "OPER FAB MEC",
         "MONT MEC",
+        "OPER MONT MEC",
         "MONT ELET",
+        "OPER MONT ELET",
     ]
 
     # 3) Detecta colunas existentes
