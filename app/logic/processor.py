@@ -164,6 +164,10 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     if "ITEM" not in eap.columns:
         raise ValueError("EAP não possui coluna 'ITEM'.")
 
+    # Evita colisao com QTDE da FAC durante o merge
+    if "QTDE" in eap.columns:
+        eap = eap.rename(columns={"QTDE": "QTDE_EAP"})
+
     # --------------------------------------------------------
     # LEVEL 2 → X.X  (vira SUBESTACAO)
     # --------------------------------------------------------
@@ -220,6 +224,18 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     for col in fac_functions:
         if col in merged.columns:
             merged[col] = merged[col].fillna(0)
+
+    # Multiplica colunas da FAC pela QTDE da EAP antes de remover QTDEs
+    qtde_eap_col = None
+    for candidate in ("QTDE_EAP", "QTDE", "QTDE_x"):
+        if candidate in merged.columns:
+            qtde_eap_col = candidate
+            break
+
+    if qtde_eap_col:
+        for col in fac_functions:
+            if col in merged.columns:
+                merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0) * merged[qtde_eap_col].fillna(0)
 
     # Remove colunas de QTDE
     qtde_cols = [c for c in merged.columns if c.upper().startswith("QTDE")]
