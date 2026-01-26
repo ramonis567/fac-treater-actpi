@@ -79,10 +79,17 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
         "QTDE",
         "MAT. ESPEC.",
         "MAT. GERAL",
+        "COOR ENG ELET",
+        "CONS ENG ELET",
+        "PROJ ELET/MEC",
+        "TEC INSTAL",
+        "APOIO ELET/MEC",
+        "ESTAG ELET/MEC",
         "COOR ENG DTFD",
         "CONS ENG DTFD",
         "PROJ DTFD",
         "APOIO DTFD",
+        "ESTAG DTFD",
         "FAB MEC",
         "OPER FAB MEC",
         "MONT MEC",
@@ -236,13 +243,15 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
         for col in fac_functions:
             if col in merged.columns:
                 merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0) * merged[qtde_eap_col].fillna(0)
+        if qtde_eap_col != "QTDE":
+            merged["QTDE"] = merged[qtde_eap_col]
 
     # Remove colunas de QTDE
-    qtde_cols = [c for c in merged.columns if c.upper().startswith("QTDE")]
+    qtde_cols = [c for c in merged.columns if c.upper().startswith("QTDE") and c != "QTDE"]
     merged = merged.drop(columns=qtde_cols, errors="ignore")
 
     # Reordena colunas: ITEM | SUBESTACAO | TAG_CODE | TAG_DESCRICAO | TAG_RAW | ...
-    priority_cols = ["ITEM", "SUBESTACAO", "TAG_CODE", "TAG_DESCRICAO", "TAG_RAW"]
+    priority_cols = ["ITEM", "SUBESTACAO", "QTDE", "TAG_CODE", "TAG_DESCRICAO", "TAG_RAW"]
     other_cols = [c for c in merged.columns if c not in priority_cols]
     merged = merged[priority_cols + other_cols]
 
