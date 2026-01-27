@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import re
 
 from app.logic.eap_processor import process_eap_data
@@ -46,12 +47,14 @@ def preprocess_fac(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
     # 1) Localiza linha do cabeçalho
-    header_row_idx = None
-    for i in range(len(df)):
-        row_values = df.iloc[i].astype(str).str.strip().str.upper().values
-        if "DESCRIÇÃO" in row_values:
-            header_row_idx = i
-            break
+    # Otimização: Busca vetorial em vez de iterar linha a linha
+    mask = df.astype(str).apply(lambda col: col.str.strip().str.upper() == "DESCRIÇÃO")
+    rows_with_desc = mask.any(axis=1)
+
+    if rows_with_desc.any():
+        header_row_idx = np.argmax(rows_with_desc.values)
+    else:
+        header_row_idx = None
 
     if header_row_idx is None:
         raise ValueError("Não foi possível localizar a linha de cabeçalho com 'DESCRIÇÃO' na FAC.")
