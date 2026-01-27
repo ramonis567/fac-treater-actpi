@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import re
 
 from app.logic.eap_processor import process_eap_data
@@ -265,24 +266,60 @@ def explode_by_tag(df: pd.DataFrame) -> pd.DataFrame:
     if "TAG_CODE" not in df.columns:
         return df
 
-    rows = []
+    # We work with a copy to preserve original data
+    df = df.copy()
 
-    for _, row in df.iterrows():
-        codes = [c.strip() for c in str(row["TAG_CODE"]).split("/") if c.strip()]
-        desc = row.get("TAG_DESCRICAO", "")
+    # Ensure we have a unique index to reconstruct order later
+    if not df.index.is_unique:
+        df = df.reset_index(drop=True)
 
-        if len(codes) <= 1:
-            rows.append(row)
-            continue
+    # 1. Parse codes into lists
+    # Using map/apply is faster than iterrows, and allows flexible python logic (strip/filter)
+    def parse_codes(val):
+        s = str(val)
+        if "/" in s:
+            return [c.strip() for c in s.split("/") if c.strip()]
+        # Optimization: if no slash, just return list with stripped value if not empty
+        s_strip = s.strip()
+        return [s_strip] if s_strip else []
 
-        for code in codes:
-            new_row = row.copy()
-            new_row["TAG_CODE"] = code
-            # TAG_RAW existe só para auditoria; explode mantém coerência
-            new_row["TAG_RAW"] = f"{code} - {desc}" if desc else code
-            rows.append(new_row)
+    # Apply the parsing
+    codes_series = df["TAG_CODE"].map(parse_codes)
 
-    return pd.DataFrame(rows).reset_index(drop=True)
+    # 2. Identify rows that need expanding (len > 1)
+    mask_expand = codes_series.str.len() > 1
+
+    # If nothing to expand, return original
+    if not mask_expand.any():
+        return df.reset_index(drop=True)
+
+    # 3. Rows to keep as-is
+    df_kept = df.loc[~mask_expand]
+
+    # 4. Rows to expand
+    df_to_expand = df.loc[mask_expand].copy()
+    df_to_expand["TAG_CODE"] = codes_series.loc[mask_expand]
+
+    # Explode
+    df_exploded = df_to_expand.explode("TAG_CODE")
+
+    # Update TAG_RAW for exploded rows
+    if "TAG_DESCRICAO" in df_exploded.columns:
+        # Use .fillna("") to handle NaNs safely
+        desc = df_exploded["TAG_DESCRICAO"].fillna("").astype(str)
+        code = df_exploded["TAG_CODE"].astype(str)
+
+        # Vectorized string formatting: f"{code} - {desc}" if desc else code
+        has_desc = desc != ""
+        new_tag_raw = np.where(has_desc, code + " - " + desc, code)
+        df_exploded["TAG_RAW"] = new_tag_raw
+    else:
+        df_exploded["TAG_RAW"] = df_exploded["TAG_CODE"]
+
+    # 5. Concatenate and restore order
+    final_df = pd.concat([df_kept, df_exploded]).sort_index(kind='stable')
+
+    return final_df.reset_index(drop=True)
 
 
 # ============================================================
