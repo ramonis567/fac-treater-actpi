@@ -141,12 +141,15 @@ def process_fac(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 #  FUNÇÃO DE DIVISÃO DE TAG
 # ============================================================
+_TAG_SPLIT_REGEX = re.compile(r"\s*-\s*")
+
+
 def split_tag(tag: str):
     """Divide TAG em TAG_CODE e TAG_DESCRICAO."""
     if not tag or str(tag).lower() == "nan":
         return "", ""
 
-    parts = re.split(r"\s*-\s*", tag, maxsplit=1)
+    parts = _TAG_SPLIT_REGEX.split(tag, maxsplit=1)
 
     if len(parts) == 1:
         return parts[0].strip(), ""
