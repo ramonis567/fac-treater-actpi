@@ -209,9 +209,11 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     eap_lvl4["SUBESTACAO"] = eap_lvl4["ITEM"].astype(str).apply(find_subestacao)
     eap_lvl4["TAG_RAW"] = eap_lvl4["ITEM"].astype(str).apply(find_parent_tag)
 
-    eap_lvl4[["TAG_CODE", "TAG_DESCRICAO"]] = eap_lvl4["TAG_RAW"].apply(
-        lambda x: pd.Series(split_tag(x))
-    )
+    if eap_lvl4.empty:
+        eap_lvl4["TAG_CODE"] = []
+        eap_lvl4["TAG_DESCRICAO"] = []
+    else:
+        eap_lvl4["TAG_CODE"], eap_lvl4["TAG_DESCRICAO"] = zip(*eap_lvl4["TAG_RAW"].map(split_tag))
 
     # --------------------------------------------------------
     # MERGE
