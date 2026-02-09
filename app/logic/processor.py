@@ -188,10 +188,6 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     eap_lvl2 = eap[eap["ITEM"].astype(str).str.match(regex_lvl2, na=False)]
     level2_map = dict(zip(eap_lvl2["ITEM"], eap_lvl2["DESCRICAO"]))
 
-    def find_subestacao(item: str) -> str:
-        key = ".".join(item.split(".")[:2])
-        return level2_map.get(key, "")
-
     # --------------------------------------------------------
     # LEVEL 3 → TAG
     # --------------------------------------------------------
@@ -199,21 +195,23 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     eap_lvl3 = eap[eap["ITEM"].astype(str).str.match(regex_lvl3, na=False)]
     level3_map = dict(zip(eap_lvl3["ITEM"], eap_lvl3["DESCRICAO"]))
 
-    def find_parent_tag(item: str) -> str:
-        parts = item.split(".")
-        if len(parts) == 4:
-            parent = ".".join(parts[:3])
-            return level3_map.get(parent, "")
-        return ""
-
     # --------------------------------------------------------
     # LEVEL 4 → ITENS FINAIS
     # --------------------------------------------------------
     regex_lvl4 = r"^\d+\.\d+\.\d+\.\d+$"
     eap_lvl4 = eap[eap["ITEM"].astype(str).str.match(regex_lvl4, na=False)].copy()
 
-    eap_lvl4["SUBESTACAO"] = eap_lvl4["ITEM"].astype(str).apply(find_subestacao)
-    eap_lvl4["TAG_RAW"] = eap_lvl4["ITEM"].astype(str).apply(find_parent_tag)
+    # Otimização: Vetorização da busca de TAG e SUBESTACAO
+    items_arr = eap_lvl4["ITEM"].astype(str).values
+
+    # 1. Obter chave do pai (TAG) -> Remove último segmento (X.Y.Z.W -> X.Y.Z)
+    parent_keys = [x.rpartition('.')[0] for x in items_arr]
+    eap_lvl4["TAG_RAW"] = [level3_map.get(k, "") for k in parent_keys]
+
+    # 2. Obter chave da Subestação -> Remove último segmento do pai (X.Y.Z -> X.Y)
+    # Reutiliza o cálculo anterior para performance
+    sub_keys = [x.rpartition('.')[0] for x in parent_keys]
+    eap_lvl4["SUBESTACAO"] = [level2_map.get(k, "") for k in sub_keys]
 
     if eap_lvl4.empty:
         eap_lvl4["TAG_CODE"] = []
