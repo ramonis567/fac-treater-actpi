@@ -202,16 +202,16 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     eap_lvl4 = eap[eap["ITEM"].astype(str).str.match(regex_lvl4, na=False)].copy()
 
     # Otimização: Vetorização da busca de TAG e SUBESTACAO
-    items_arr = eap_lvl4["ITEM"].astype(str).values
+    items_s = eap_lvl4["ITEM"].astype(str)
 
     # 1. Obter chave do pai (TAG) -> Remove último segmento (X.Y.Z.W -> X.Y.Z)
-    parent_keys = [x.rpartition('.')[0] for x in items_arr]
-    eap_lvl4["TAG_RAW"] = [level3_map.get(k, "") for k in parent_keys]
+    parent_keys_s = items_s.str.rpartition('.').str[0]
+    eap_lvl4["TAG_RAW"] = parent_keys_s.map(level3_map).fillna("")
 
     # 2. Obter chave da Subestação -> Remove último segmento do pai (X.Y.Z -> X.Y)
     # Reutiliza o cálculo anterior para performance
-    sub_keys = [x.rpartition('.')[0] for x in parent_keys]
-    eap_lvl4["SUBESTACAO"] = [level2_map.get(k, "") for k in sub_keys]
+    sub_keys_s = parent_keys_s.str.rpartition('.').str[0]
+    eap_lvl4["SUBESTACAO"] = sub_keys_s.map(level2_map).fillna("")
 
     if eap_lvl4.empty:
         eap_lvl4["TAG_CODE"] = []
