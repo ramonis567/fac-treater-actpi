@@ -205,12 +205,12 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     items_s = eap_lvl4["ITEM"].astype(str)
 
     # 1. Obter chave do pai (TAG) -> Remove último segmento (X.Y.Z.W -> X.Y.Z)
-    parent_keys_s = items_s.str.rpartition('.').str[0]
+    parent_keys_s = items_s.str.rsplit(".", n=1).str[0]
     eap_lvl4["TAG_RAW"] = parent_keys_s.map(level3_map).fillna("")
 
     # 2. Obter chave da Subestação -> Remove último segmento do pai (X.Y.Z -> X.Y)
     # Reutiliza o cálculo anterior para performance
-    sub_keys_s = parent_keys_s.str.rpartition('.').str[0]
+    sub_keys_s = parent_keys_s.str.rsplit(".", n=1).str[0]
     eap_lvl4["SUBESTACAO"] = sub_keys_s.map(level2_map).fillna("")
 
     if eap_lvl4.empty:
