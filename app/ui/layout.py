@@ -35,7 +35,7 @@ def render_app():
     # Validação e processamento do arquivo
     if uploaded_file:
         try:
-            excel_file = pd.ExcelFile(uploaded_file)
+            excel_file = pd.ExcelFile(uploaded_file, engine="openpyxl")
             sheet_names = excel_file.sheet_names
 
             fac_sheet = st.selectbox(
@@ -56,17 +56,8 @@ def render_app():
             if st.button("Executar Processamento"):
                 with st.spinner("Processando FAC, EAP e Consolidação..."):
 
-                    df_fac = pd.read_excel(
-                        uploaded_file,
-                        sheet_name=fac_sheet,
-                        engine="openpyxl"
-                    )
-
-                    df_eap = pd.read_excel(
-                        uploaded_file,
-                        sheet_name=eap_sheet,
-                        engine="openpyxl"
-                    )
+                    df_fac = excel_file.parse(sheet_name=fac_sheet)
+                    df_eap = excel_file.parse(sheet_name=eap_sheet)
 
                     _, _, merged_processed = process_fac_and_eap(
                         df_fac, df_eap
