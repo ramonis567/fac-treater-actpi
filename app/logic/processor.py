@@ -217,7 +217,23 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
         eap_lvl4["TAG_CODE"] = []
         eap_lvl4["TAG_DESCRICAO"] = []
     else:
-        eap_lvl4["TAG_CODE"], eap_lvl4["TAG_DESCRICAO"] = zip(*eap_lvl4["TAG_RAW"].map(split_tag))
+        # Otimização: Uso de operações vetorizadas do pandas em vez de zip(*map)
+        s_raw = eap_lvl4["TAG_RAW"].astype(str)
+
+        # Identifica valores nulos ou inválidos conforme lógica do split_tag original
+        mask_empty = (eap_lvl4["TAG_RAW"].isna()) | (s_raw == "") | (s_raw.str.lower() == "nan")
+
+        # Split vetorizado respeitando o separador regex
+        split_res = s_raw.str.split(r"\s*-\s*", n=1, expand=True)
+
+        eap_lvl4["TAG_CODE"] = split_res[0].str.strip().fillna("")
+        if split_res.shape[1] > 1:
+            eap_lvl4["TAG_DESCRICAO"] = split_res[1].str.strip().fillna("")
+        else:
+            eap_lvl4["TAG_DESCRICAO"] = ""
+
+        # Aplica máscara para garantir consistência com split_tag
+        eap_lvl4.loc[mask_empty, ["TAG_CODE", "TAG_DESCRICAO"]] = ""
 
     # --------------------------------------------------------
     # MERGE
