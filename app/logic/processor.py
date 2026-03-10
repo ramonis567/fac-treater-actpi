@@ -62,10 +62,10 @@ def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
     _debug(f"[FAC] Cabeçalho localizado na linha {header_row_idx}")
 
     # 2) Promove cabeçalho
-    df = df.iloc[header_row_idx:].copy().reset_index(drop=True)
-    df.columns = df.iloc[0]
-    df = df.iloc[1:].copy().reset_index(drop=True)
-    df.columns = df.columns.astype(str).str.strip()
+    # Otimização: Evita cópias redundantes do DataFrame
+    new_columns = df.iloc[header_row_idx].astype(str).str.strip()
+    df = df.iloc[header_row_idx + 1:].copy().reset_index(drop=True)
+    df.columns = new_columns
 
     _debug(f"[FAC] Colunas detectadas: {list(df.columns)}")
 
