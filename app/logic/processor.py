@@ -234,21 +234,22 @@ def merge_fac_eap(fac_df: pd.DataFrame, eap_df: pd.DataFrame) -> pd.DataFrame:
     if "DESCRIÇÃO" in merged.columns:
         merged = merged.drop(columns=["DESCRIÇÃO"])
 
-    for col in fac_functions:
-        if col in merged.columns:
-            merged[col] = merged[col].fillna(0)
+    cols_to_process = [c for c in fac_functions if c in merged.columns]
+    if cols_to_process:
+        merged[cols_to_process] = merged[cols_to_process].fillna(0)
 
     # Multiplica colunas da FAC pela QTDE da EAP antes de remover QTDEs
-    qtde_eap_col = None
-    for candidate in ("QTDE_EAP", "QTDE", "QTDE_x"):
-        if candidate in merged.columns:
-            qtde_eap_col = candidate
-            break
+    qtde_eap_col = next((c for c in ("QTDE_EAP", "QTDE", "QTDE_x") if c in merged.columns), None)
 
     if qtde_eap_col:
-        for col in fac_functions:
-            if col in merged.columns:
-                merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0) * merged[qtde_eap_col].fillna(0)
+        if cols_to_process:
+            multiplier = pd.to_numeric(merged[qtde_eap_col], errors="coerce").fillna(0)
+            merged[cols_to_process] = (
+                merged[cols_to_process]
+                .apply(pd.to_numeric, errors="coerce")
+                .fillna(0)
+                .multiply(multiplier, axis=0)
+            )
         if qtde_eap_col != "QTDE":
             merged["QTDE"] = merged[qtde_eap_col]
 
