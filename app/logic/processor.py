@@ -48,13 +48,22 @@ def preprocess_fac(df: pd.DataFrame) -> pd.DataFrame:
 def apply_business_logic_fac(df: pd.DataFrame) -> pd.DataFrame:
     # 1) Localiza linha do cabeçalho
     # Otimização: Busca vetorial em vez de iterar linha a linha
-    mask = df.astype(str).apply(lambda col: col.str.strip().str.upper() == "DESCRIÇÃO")
+    # Otimização adicional: Busca primeiro nas primeiras N linhas (cabeçalho quase sempre no topo)
+    limit = 20
+    df_head = df.iloc[:limit]
+
+    mask = df_head.astype(str).apply(lambda col: col.str.strip().str.upper() == "DESCRIÇÃO")
     rows_with_desc = mask.any(axis=1)
 
+    header_row_idx = None
     if rows_with_desc.any():
         header_row_idx = np.argmax(rows_with_desc.values)
     else:
-        header_row_idx = None
+        # Fallback: busca no restante do DataFrame
+        mask = df.iloc[limit:].astype(str).apply(lambda col: col.str.strip().str.upper() == "DESCRIÇÃO")
+        rows_with_desc = mask.any(axis=1)
+        if rows_with_desc.any():
+            header_row_idx = np.argmax(rows_with_desc.values) + limit
 
     if header_row_idx is None:
         raise ValueError("Não foi possível localizar a linha de cabeçalho com 'DESCRIÇÃO' na FAC.")
